@@ -2035,8 +2035,83 @@ RPN > 100 indicates high priority items needing immediate attention.
         self.sessionWindow.setText(f"Sigma Level: {sigma:.2f}")
 
     def yieldAnalysis(self):
-        """Perform process yield analysis"""
-        QMessageBox.information(self, "Coming Soon", "Yield Analysis feature will be added in the next update.")
+        """Calculate process yield based on defects and opportunities"""
+        dialog = QDialog(self)
+        dialog.setWindowTitle("Process Yield Analysis")
+        layout = QFormLayout()
+
+        # Input fields
+        units_input = QLineEdit()
+        defects_input = QLineEdit()
+        opportunities_input = QLineEdit()
+
+        layout.addRow("Number of Units:", units_input)
+        layout.addRow("Total Defects:", defects_input)
+        layout.addRow("Opportunities per Unit:", opportunities_input)
+
+        # Results labels
+        yield_label = QLabel()
+        dpmo_label = QLabel()
+        sigma_label = QLabel()
+
+        # Calculate button
+        calc_button = QPushButton("Calculate")
+
+        def calculate_yield():
+            try:
+                units = float(units_input.text())
+                defects = float(defects_input.text())
+                opportunities = float(opportunities_input.text())
+
+                # Calculate DPMO
+                dpmo = calculate_dpmo(defects, opportunities, units)
+                
+                # Calculate process yield
+                total_opportunities = units * opportunities
+                process_yield = ((total_opportunities - defects) / total_opportunities) * 100
+                
+                # Calculate sigma level
+                sigma_level = dpmo_to_sigma(dpmo)
+
+                # Update labels
+                yield_label.setText(f"Process Yield: {process_yield:.2f}%")
+                dpmo_label.setText(f"DPMO: {dpmo:.2f}")
+                sigma_label.setText(f"Sigma Level: {sigma_level:.2f}")
+
+                # Add results to session window
+                report = f"""Process Yield Analysis Results:
+------------------------
+Number of Units: {units}
+Total Defects: {defects}
+Opportunities per Unit: {opportunities}
+------------------------
+Process Yield: {process_yield:.2f}%
+DPMO: {dpmo:.2f}
+Sigma Level: {sigma_level:.2f}
+"""
+                self.sessionWindow.append(report)
+
+            except ValueError:
+                QMessageBox.warning(dialog, "Error", "Please enter valid numbers")
+
+        calc_button.clicked.connect(calculate_yield)
+
+        # Add results to layout
+        results_group = QGroupBox("Results")
+        results_layout = QVBoxLayout()
+        results_layout.addWidget(yield_label)
+        results_layout.addWidget(dpmo_label)
+        results_layout.addWidget(sigma_label)
+        results_group.setLayout(results_layout)
+
+        # Main layout
+        main_layout = QVBoxLayout()
+        main_layout.addLayout(layout)
+        main_layout.addWidget(calc_button)
+        main_layout.addWidget(results_group)
+
+        dialog.setLayout(main_layout)
+        dialog.exec()
 
     def biasStudy(self):
         """Perform measurement system bias study"""
