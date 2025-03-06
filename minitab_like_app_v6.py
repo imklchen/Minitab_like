@@ -12,6 +12,7 @@ from PyQt6.QtWidgets import (QApplication, QMainWindow, QTableWidget, QTableWidg
                              QPushButton, QLabel, QComboBox, QVBoxLayout, QHBoxLayout, QGroupBox)
 from PyQt6.QtGui import QAction
 from PyQt6.QtCore import Qt
+import seaborn as sns
 
 def calculate_control_limits(data, n=1):
     """Calculate control limits for X-bar and R charts"""
@@ -144,6 +145,7 @@ class MinitabLikeApp(QMainWindow):
         advancedStatMenu.addAction(self.makeAction("Hypothesis Testing", self.hypothesisTesting))
         advancedStatMenu.addAction(self.makeAction("ANOVA", self.performANOVA))
         advancedStatMenu.addAction(self.makeAction("Regression Analysis", self.regressionAnalysis))
+        advancedStatMenu.addAction(self.makeAction("Chi-Square Tests", self.chiSquareTests))
 
         # Add Design of Experiments directly to Stat menu
         statMenu.addAction(self.makeAction("Create DOE", self.createDOE))
@@ -1197,13 +1199,282 @@ Factors and Levels:
 
     def create_fractional_factorial(self):
         """Create fractional factorial design"""
-        QMessageBox.information(self, "Coming Soon", 
-            "Fractional Factorial design will be implemented in the next update.")
+        # Get number of factors
+        n_factors, ok = QInputDialog.getInt(self, "Fractional Factorial Design", 
+            "Enter number of factors (3-7):", 3, 3, 7)
+        if not ok:
+            return
+
+        # Get resolution level
+        resolution_options = []
+        max_resolution = n_factors
+        for r in range(3, max_resolution + 1):
+            if 2**(n_factors - 1) >= n_factors:  # Modified condition
+                resolution_options.append(f"Resolution {r}")
+        
+        if not resolution_options:
+            QMessageBox.warning(self, "Warning", 
+                "No valid resolution available for this number of factors")
+            return
+
+        resolution, ok = QInputDialog.getItem(self, "Fractional Factorial Design",
+            "Select design resolution:", resolution_options, 0, False)
+        if not ok:
+            return
+        
+        resolution_level = int(resolution.split()[-1])
+
+        # Get factor names and levels
+        factors = []
+        levels = []
+        for i in range(n_factors):
+            # Get factor name
+            name, ok = QInputDialog.getText(self, f"Factor {i+1}", 
+                f"Enter name for factor {i+1}:")
+            if not ok:
+                return
+            factors.append(name)
+            
+            # Get factor levels
+            low, ok = QInputDialog.getText(self, f"Factor {i+1} Low", 
+                f"Enter low level for {name}:")
+            if not ok:
+                return
+            high, ok = QInputDialog.getText(self, f"Factor {i+1} High", 
+                f"Enter high level for {name}:")
+            if not ok:
+                return
+            levels.append([low, high])
+
+        # Calculate number of runs needed
+        n_runs = 2**(n_factors - 1)  # Modified for half-fraction
+
+        # Create basic design matrix
+        basic_design = []
+        for i in range(n_runs):
+            run = []
+            for j in range(n_factors - 1):  # Generate for all but one factor
+                level_idx = (i >> j) & 1
+                run.append(level_idx)
+            
+            # Generate the last factor based on the interaction of other factors
+            last_factor = 0
+            for j in range(n_factors - 1):
+                last_factor ^= run[j]
+            run.append(last_factor)
+            
+            basic_design.append(run)
+
+        # Convert design to actual factor levels
+        design_matrix = []
+        for run in basic_design:
+            actual_run = []
+            for j, level_idx in enumerate(run):
+                actual_run.append(levels[j][level_idx])
+            design_matrix.append(actual_run)
+
+        # Create DataFrame with the design
+        df = pd.DataFrame(design_matrix, columns=factors)
+        df.insert(0, 'StdOrder', range(1, len(df) + 1))
+        df.insert(1, 'RunOrder', np.random.permutation(len(df)) + 1)
+        df['Response'] = ''  # Empty column for responses
+
+        # Update the table with the design
+        self.data = df
+        self.updateTable()
+
+        # Show design summary
+        summary = f"""Fractional Factorial Design Summary
+
+Number of factors: {n_factors}
+Resolution: {resolution}
+Number of runs: {n_runs}
+Fraction: 1/2
+
+Factors and Levels:
+"""
+        for i, factor in enumerate(factors):
+            summary += f"{factor}: {levels[i][0]} | {levels[i][1]}\n"
+
+        if n_factors > 2:
+            summary += "\nDesign Generator:\n"
+            summary += f"{factors[-1]} = {' × '.join(factors[:-1])}\n"
+
+        self.sessionWindow.setText(summary)
 
     def create_response_surface(self):
         """Create response surface design"""
-        QMessageBox.information(self, "Coming Soon", 
-            "Response Surface design will be implemented in the next update.")
+        # Get design type
+        design_type, ok = QInputDialog.getItem(self, "Response Surface Design",
+            "Select design type:",
+            ["Central Composite Design (CCD)", "Box-Behnken Design (BBD)"], 0, False)
+        if not ok:
+            return
+
+        # Get number of factors
+        min_factors = 2 if design_type.startswith("Central") else 3
+        max_factors = 6 if design_type.startswith("Central") else 7
+        n_factors, ok = QInputDialog.getInt(self, "Response Surface Design", 
+            f"Enter number of factors ({min_factors}-{max_factors}):", 
+            min_factors, min_factors, max_factors)
+        if not ok:
+            return
+
+        # Get factor names and levels
+        factors = []
+        center_points = []
+        ranges = []
+        
+        for i in range(n_factors):
+            # Get factor name
+            name, ok = QInputDialog.getText(self, f"Factor {i+1}", 
+                f"Enter name for factor {i+1}:")
+            if not ok:
+                return
+            factors.append(name)
+            
+            # Get factor center point and range
+            center, ok = QInputDialog.getDouble(self, f"Factor {i+1} Center", 
+                f"Enter center point for {name}:")
+            if not ok:
+                return
+            center_points.append(center)
+            
+            range_val, ok = QInputDialog.getDouble(self, f"Factor {i+1} Range", 
+                f"Enter range (±) for {name}:")
+            if not ok:
+                return
+            ranges.append(range_val)
+
+        # Get number of center points
+        n_center, ok = QInputDialog.getInt(self, "Center Points", 
+            "Enter number of center points:", 3, 1, 10)
+        if not ok:
+            return
+
+        # Create design matrix based on design type
+        if design_type.startswith("Central"):
+            # Central Composite Design
+            # Get alpha type
+            alpha_type, ok = QInputDialog.getItem(self, "CCD Alpha",
+                "Select alpha type:",
+                ["Rotatable", "Orthogonal", "Face-centered"], 0, False)
+            if not ok:
+                return
+
+            # Calculate alpha value
+            if alpha_type == "Rotatable":
+                alpha = (2**n_factors)**(1/4)
+            elif alpha_type == "Face-centered":
+                alpha = 1.0
+            else:  # Orthogonal
+                n_factorial = 2**n_factors
+                n_axial = 2 * n_factors
+                alpha = ((n_factorial * (1 + n_center/n_factorial))/n_axial)**(1/4)
+
+            # Create factorial points
+            factorial_points = []
+            for i in range(2**n_factors):
+                point = []
+                for j in range(n_factors):
+                    level = -1 if (i >> j) & 1 else 1
+                    point.append(level)
+                factorial_points.append(point)
+
+            # Create axial points
+            axial_points = []
+            for i in range(n_factors):
+                point_plus = [0] * n_factors
+                point_minus = [0] * n_factors
+                point_plus[i] = alpha
+                point_minus[i] = -alpha
+                axial_points.append(point_plus)
+                axial_points.append(point_minus)
+
+            # Create center points
+            center_points_design = [[0] * n_factors for _ in range(n_center)]
+
+            # Combine all points
+            coded_design = factorial_points + axial_points + center_points_design
+
+        else:
+            # Box-Behnken Design
+            if n_factors < 3:
+                QMessageBox.warning(self, "Warning", 
+                    "Box-Behnken design requires at least 3 factors")
+                return
+
+            # Create design points
+            coded_design = []
+            
+            # Add factorial points for pairs of factors
+            for i in range(n_factors - 1):
+                for j in range(i + 1, n_factors):
+                    for level_i in [-1, 1]:
+                        for level_j in [-1, 1]:
+                            point = [0] * n_factors
+                            point[i] = level_i
+                            point[j] = level_j
+                            coded_design.append(point)
+
+            # Add center points
+            center_points_design = [[0] * n_factors for _ in range(n_center)]
+            coded_design.extend(center_points_design)
+
+        # Convert coded levels to actual values
+        design_matrix = []
+        for run in coded_design:
+            actual_run = []
+            for i, coded_level in enumerate(run):
+                actual_value = center_points[i] + coded_level * ranges[i]
+                actual_run.append(actual_value)
+            design_matrix.append(actual_run)
+
+        # Create DataFrame with the design
+        df = pd.DataFrame(design_matrix, columns=factors)
+        df.insert(0, 'StdOrder', range(1, len(df) + 1))
+        df.insert(1, 'RunOrder', np.random.permutation(len(df)) + 1)
+        df['Response'] = ''  # Empty column for responses
+
+        # Add point type information
+        if design_type.startswith("Central"):
+            point_types = (['Factorial'] * 2**n_factors + 
+                         ['Axial'] * (2 * n_factors) +
+                         ['Center'] * n_center)
+        else:  # Box-Behnken
+            n_factorial = n_factors * (n_factors - 1) * 2
+            point_types = ['Factorial'] * n_factorial + ['Center'] * n_center
+
+        df['PointType'] = point_types
+
+        # Update the table with the design
+        self.data = df
+        self.updateTable()
+
+        # Show design summary
+        summary = f"""Response Surface Design Summary
+
+Design Type: {design_type}
+Number of factors: {n_factors}
+Number of runs: {len(df)}
+
+Design Points:
+Factorial points: {len([pt for pt in point_types if pt == 'Factorial'])}
+{'Axial points: ' + str(len([pt for pt in point_types if pt == 'Axial'])) if design_type.startswith('Central') else ''}
+Center points: {n_center}
+
+Factors:
+"""
+        for i, factor in enumerate(factors):
+            summary += f"{factor}:\n"
+            summary += f"  Center: {center_points[i]}\n"
+            summary += f"  Range: ±{ranges[i]}\n"
+
+        if design_type.startswith("Central"):
+            summary += f"\nAlpha Type: {alpha_type}"
+            summary += f"\nAlpha Value: {alpha:.4f}"
+
+        self.sessionWindow.setText(summary)
 
     def analyzeDOE(self):
         """Analyze Design of Experiments"""
@@ -2354,6 +2625,282 @@ Assessment:
         except Exception as e:
             QMessageBox.warning(self, "Error", 
                 f"An error occurred during stability analysis:\n{str(e)}\n\n"
+                "Please check your data and try again.")
+
+    def chiSquareTests(self):
+        """Perform Chi-Square analysis"""
+        # Create dialog for test selection
+        test_type, ok = QInputDialog.getItem(self, "Chi-Square Analysis",
+            "Select Test Type:",
+            ["Goodness of Fit", "Test of Independence", "Test of Homogeneity"], 0, False)
+        if not ok:
+            return
+
+        if test_type == "Goodness of Fit":
+            self.chiSquareGoodnessOfFit()
+        elif test_type == "Test of Independence":
+            self.chiSquareIndependence()
+        else:
+            self.chiSquareHomogeneity()
+
+    def chiSquareGoodnessOfFit(self):
+        """Perform Chi-Square Goodness of Fit test"""
+        # Get observed frequencies column
+        observed_col = self.selectColumnDialog()
+        if not observed_col:
+            return
+
+        # Get expected probabilities
+        prob_type, ok = QInputDialog.getItem(self, "Expected Probabilities",
+            "Select probability type:",
+            ["Equal probabilities", "Custom probabilities"], 0, False)
+        if not ok:
+            return
+
+        try:
+            # Get observed frequencies
+            observed = pd.to_numeric(self.data[observed_col], errors='coerce').dropna()
+            n_categories = len(observed)
+
+            if n_categories < 2:
+                QMessageBox.warning(self, "Warning", "Need at least 2 categories for chi-square test")
+                return
+
+            # Get expected probabilities
+            if prob_type == "Equal probabilities":
+                expected_probs = np.ones(n_categories) / n_categories
+            else:
+                # Get custom probabilities from user
+                probs = []
+                total_prob = 0
+                for i in range(n_categories):
+                    prob, ok = QInputDialog.getDouble(self, f"Category {i+1}",
+                        f"Enter probability for category {i+1}:",
+                        1/n_categories, 0, 1, 4)
+                    if not ok:
+                        return
+                    probs.append(prob)
+                    total_prob += prob
+
+                if abs(total_prob - 1) > 0.0001:
+                    QMessageBox.warning(self, "Warning", "Probabilities must sum to 1")
+                    return
+                expected_probs = np.array(probs)
+
+            # Calculate expected frequencies
+            total_obs = sum(observed)
+            expected = expected_probs * total_obs
+
+            # Perform chi-square test
+            chi2_stat, p_value = stats.chisquare(observed, expected)
+
+            # Calculate contribution to chi-square for each category
+            contributions = (observed - expected) ** 2 / expected
+
+            # Create report
+            report = f"""Chi-Square Goodness of Fit Test Results
+
+Test Information:
+Number of categories: {n_categories}
+Total observations: {total_obs}
+
+Test Statistics:
+Chi-square statistic: {chi2_stat:.4f}
+Degrees of freedom: {n_categories - 1}
+p-value: {p_value:.4f}
+
+Category Details:
+{"Category":<10} {"Observed":<10} {"Expected":<10} {"Contribution":<10}
+{"-"*40}
+"""
+            for i in range(n_categories):
+                report += f"{i+1:<10} {observed[i]:<10.0f} {expected[i]:<10.2f} {contributions[i]:<10.4f}\n"
+
+            report += f"""
+Decision:
+{"Reject" if p_value < 0.05 else "Fail to reject"} the null hypothesis at α = 0.05
+
+Note: The null hypothesis is that the observed frequencies follow the specified distribution."""
+
+            self.sessionWindow.setText(report)
+
+            # Create visualization
+            plt.figure(figsize=(10, 6))
+            x = range(n_categories)
+            width = 0.35
+
+            plt.bar([i - width/2 for i in x], observed, width, label='Observed', color='blue', alpha=0.7)
+            plt.bar([i + width/2 for i in x], expected, width, label='Expected', color='red', alpha=0.7)
+
+            plt.xlabel('Category')
+            plt.ylabel('Frequency')
+            plt.title('Chi-Square Goodness of Fit Test\nObserved vs Expected Frequencies')
+            plt.legend()
+            plt.xticks(x)
+            plt.grid(True, alpha=0.3)
+            plt.show()
+
+        except Exception as e:
+            QMessageBox.warning(self, "Error",
+                f"An error occurred during chi-square analysis:\n{str(e)}\n\n"
+                "Please check your data and try again.")
+
+    def chiSquareIndependence(self):
+        """Perform Chi-Square Test of Independence"""
+        # Get first variable column
+        var1_col = self.selectColumnDialog()
+        if not var1_col:
+            return
+
+        # Get second variable column
+        var2_col = self.selectColumnDialog()
+        if not var2_col:
+            return
+
+        try:
+            # Create contingency table
+            contingency = pd.crosstab(self.data[var1_col], self.data[var2_col])
+            
+            # Perform chi-square test
+            chi2_stat, p_value, dof, expected = stats.chi2_contingency(contingency)
+            
+            # Calculate contributions to chi-square
+            contributions = (contingency - expected) ** 2 / expected
+
+            # Create report
+            report = f"""Chi-Square Test of Independence Results
+
+Test Information:
+Variables: {var1_col} and {var2_col}
+Number of rows: {contingency.shape[0]}
+Number of columns: {contingency.shape[1]}
+
+Test Statistics:
+Chi-square statistic: {chi2_stat:.4f}
+Degrees of freedom: {dof}
+p-value: {p_value:.4f}
+
+Contingency Table:
+{contingency.to_string()}
+
+Expected Frequencies:
+{pd.DataFrame(expected, index=contingency.index, columns=contingency.columns).to_string()}
+
+Chi-Square Contributions:
+{contributions.to_string()}
+
+Decision:
+{"Reject" if p_value < 0.05 else "Fail to reject"} the null hypothesis at α = 0.05
+
+Note: The null hypothesis is that the variables are independent."""
+
+            self.sessionWindow.setText(report)
+
+            # Create visualization
+            plt.figure(figsize=(12, 5))
+            
+            # Observed frequencies plot
+            plt.subplot(1, 2, 1)
+            sns.heatmap(contingency, annot=True, fmt='d', cmap='YlOrRd')
+            plt.title('Observed Frequencies')
+            
+            # Expected frequencies plot
+            plt.subplot(1, 2, 2)
+            sns.heatmap(pd.DataFrame(expected, index=contingency.index, columns=contingency.columns),
+                       annot=True, fmt='.1f', cmap='YlOrRd')
+            plt.title('Expected Frequencies')
+            
+            plt.tight_layout()
+            plt.show()
+
+        except Exception as e:
+            QMessageBox.warning(self, "Error",
+                f"An error occurred during chi-square analysis:\n{str(e)}\n\n"
+                "Please check your data and try again.")
+
+    def chiSquareHomogeneity(self):
+        """Perform Chi-Square Test of Homogeneity"""
+        # Get category column
+        category_col = self.selectColumnDialog()
+        if not category_col:
+            return
+
+        # Get group column
+        group_col = self.selectColumnDialog()
+        if not group_col:
+            return
+
+        try:
+            # Create contingency table
+            contingency = pd.crosstab(self.data[group_col], self.data[category_col])
+            
+            # Perform chi-square test
+            chi2_stat, p_value, dof, expected = stats.chi2_contingency(contingency)
+            
+            # Calculate contributions to chi-square
+            contributions = (contingency - expected) ** 2 / expected
+
+            # Calculate proportions for each group
+            proportions = contingency.div(contingency.sum(axis=1), axis=0)
+
+            # Create report
+            report = f"""Chi-Square Test of Homogeneity Results
+
+Test Information:
+Groups: {group_col}
+Categories: {category_col}
+Number of groups: {contingency.shape[0]}
+Number of categories: {contingency.shape[1]}
+
+Test Statistics:
+Chi-square statistic: {chi2_stat:.4f}
+Degrees of freedom: {dof}
+p-value: {p_value:.4f}
+
+Contingency Table (Frequencies):
+{contingency.to_string()}
+
+Proportions within Groups:
+{proportions.to_string()}
+
+Expected Frequencies:
+{pd.DataFrame(expected, index=contingency.index, columns=contingency.columns).to_string()}
+
+Chi-Square Contributions:
+{contributions.to_string()}
+
+Decision:
+{"Reject" if p_value < 0.05 else "Fail to reject"} the null hypothesis at α = 0.05
+
+Note: The null hypothesis is that the proportions are the same across groups."""
+
+            self.sessionWindow.setText(report)
+
+            # Create visualizations
+            plt.figure(figsize=(15, 5))
+            
+            # Frequencies plot
+            plt.subplot(1, 3, 1)
+            sns.heatmap(contingency, annot=True, fmt='d', cmap='YlOrRd')
+            plt.title('Observed Frequencies')
+            
+            # Proportions plot
+            plt.subplot(1, 3, 2)
+            sns.heatmap(proportions, annot=True, fmt='.2f', cmap='YlOrRd')
+            plt.title('Proportions within Groups')
+            
+            # Expected frequencies plot
+            plt.subplot(1, 3, 3)
+            sns.heatmap(pd.DataFrame(expected, index=contingency.index, columns=contingency.columns),
+                       annot=True, fmt='.1f', cmap='YlOrRd')
+            plt.title('Expected Frequencies')
+            
+            plt.tight_layout()
+            plt.show()
+
+        except Exception as e:
+            QMessageBox.warning(self, "Error",
+                f"An error occurred during chi-square analysis:\n{str(e)}\n\n"
                 "Please check your data and try again.")
 
 if __name__ == '__main__':
