@@ -12,6 +12,7 @@ from PyQt6.QtWidgets import (QApplication, QMainWindow, QTableWidget, QTableWidg
                              QPushButton, QLabel, QComboBox, QVBoxLayout, QHBoxLayout, QGroupBox)
 from PyQt6.QtGui import QAction
 from PyQt6.QtCore import Qt
+import seaborn as sns
 
 def calculate_control_limits(data, n=1):
     """Calculate control limits for X-bar and R charts"""
@@ -144,6 +145,7 @@ class MinitabLikeApp(QMainWindow):
         advancedStatMenu.addAction(self.makeAction("Hypothesis Testing", self.hypothesisTesting))
         advancedStatMenu.addAction(self.makeAction("ANOVA", self.performANOVA))
         advancedStatMenu.addAction(self.makeAction("Regression Analysis", self.regressionAnalysis))
+        advancedStatMenu.addAction(self.makeAction("Chi-Square Tests", self.chiSquareTests))
 
         # Add Design of Experiments directly to Stat menu
         statMenu.addAction(self.makeAction("Create DOE", self.createDOE))
@@ -2623,6 +2625,282 @@ Assessment:
         except Exception as e:
             QMessageBox.warning(self, "Error", 
                 f"An error occurred during stability analysis:\n{str(e)}\n\n"
+                "Please check your data and try again.")
+
+    def chiSquareTests(self):
+        """Perform Chi-Square analysis"""
+        # Create dialog for test selection
+        test_type, ok = QInputDialog.getItem(self, "Chi-Square Analysis",
+            "Select Test Type:",
+            ["Goodness of Fit", "Test of Independence", "Test of Homogeneity"], 0, False)
+        if not ok:
+            return
+
+        if test_type == "Goodness of Fit":
+            self.chiSquareGoodnessOfFit()
+        elif test_type == "Test of Independence":
+            self.chiSquareIndependence()
+        else:
+            self.chiSquareHomogeneity()
+
+    def chiSquareGoodnessOfFit(self):
+        """Perform Chi-Square Goodness of Fit test"""
+        # Get observed frequencies column
+        observed_col = self.selectColumnDialog()
+        if not observed_col:
+            return
+
+        # Get expected probabilities
+        prob_type, ok = QInputDialog.getItem(self, "Expected Probabilities",
+            "Select probability type:",
+            ["Equal probabilities", "Custom probabilities"], 0, False)
+        if not ok:
+            return
+
+        try:
+            # Get observed frequencies
+            observed = pd.to_numeric(self.data[observed_col], errors='coerce').dropna()
+            n_categories = len(observed)
+
+            if n_categories < 2:
+                QMessageBox.warning(self, "Warning", "Need at least 2 categories for chi-square test")
+                return
+
+            # Get expected probabilities
+            if prob_type == "Equal probabilities":
+                expected_probs = np.ones(n_categories) / n_categories
+            else:
+                # Get custom probabilities from user
+                probs = []
+                total_prob = 0
+                for i in range(n_categories):
+                    prob, ok = QInputDialog.getDouble(self, f"Category {i+1}",
+                        f"Enter probability for category {i+1}:",
+                        1/n_categories, 0, 1, 4)
+                    if not ok:
+                        return
+                    probs.append(prob)
+                    total_prob += prob
+
+                if abs(total_prob - 1) > 0.0001:
+                    QMessageBox.warning(self, "Warning", "Probabilities must sum to 1")
+                    return
+                expected_probs = np.array(probs)
+
+            # Calculate expected frequencies
+            total_obs = sum(observed)
+            expected = expected_probs * total_obs
+
+            # Perform chi-square test
+            chi2_stat, p_value = stats.chisquare(observed, expected)
+
+            # Calculate contribution to chi-square for each category
+            contributions = (observed - expected) ** 2 / expected
+
+            # Create report
+            report = f"""Chi-Square Goodness of Fit Test Results
+
+Test Information:
+Number of categories: {n_categories}
+Total observations: {total_obs}
+
+Test Statistics:
+Chi-square statistic: {chi2_stat:.4f}
+Degrees of freedom: {n_categories - 1}
+p-value: {p_value:.4f}
+
+Category Details:
+{"Category":<10} {"Observed":<10} {"Expected":<10} {"Contribution":<10}
+{"-"*40}
+"""
+            for i in range(n_categories):
+                report += f"{i+1:<10} {observed[i]:<10.0f} {expected[i]:<10.2f} {contributions[i]:<10.4f}\n"
+
+            report += f"""
+Decision:
+{"Reject" if p_value < 0.05 else "Fail to reject"} the null hypothesis at α = 0.05
+
+Note: The null hypothesis is that the observed frequencies follow the specified distribution."""
+
+            self.sessionWindow.setText(report)
+
+            # Create visualization
+            plt.figure(figsize=(10, 6))
+            x = range(n_categories)
+            width = 0.35
+
+            plt.bar([i - width/2 for i in x], observed, width, label='Observed', color='blue', alpha=0.7)
+            plt.bar([i + width/2 for i in x], expected, width, label='Expected', color='red', alpha=0.7)
+
+            plt.xlabel('Category')
+            plt.ylabel('Frequency')
+            plt.title('Chi-Square Goodness of Fit Test\nObserved vs Expected Frequencies')
+            plt.legend()
+            plt.xticks(x)
+            plt.grid(True, alpha=0.3)
+            plt.show()
+
+        except Exception as e:
+            QMessageBox.warning(self, "Error",
+                f"An error occurred during chi-square analysis:\n{str(e)}\n\n"
+                "Please check your data and try again.")
+
+    def chiSquareIndependence(self):
+        """Perform Chi-Square Test of Independence"""
+        # Get first variable column
+        var1_col = self.selectColumnDialog()
+        if not var1_col:
+            return
+
+        # Get second variable column
+        var2_col = self.selectColumnDialog()
+        if not var2_col:
+            return
+
+        try:
+            # Create contingency table
+            contingency = pd.crosstab(self.data[var1_col], self.data[var2_col])
+            
+            # Perform chi-square test
+            chi2_stat, p_value, dof, expected = stats.chi2_contingency(contingency)
+            
+            # Calculate contributions to chi-square
+            contributions = (contingency - expected) ** 2 / expected
+
+            # Create report
+            report = f"""Chi-Square Test of Independence Results
+
+Test Information:
+Variables: {var1_col} and {var2_col}
+Number of rows: {contingency.shape[0]}
+Number of columns: {contingency.shape[1]}
+
+Test Statistics:
+Chi-square statistic: {chi2_stat:.4f}
+Degrees of freedom: {dof}
+p-value: {p_value:.4f}
+
+Contingency Table:
+{contingency.to_string()}
+
+Expected Frequencies:
+{pd.DataFrame(expected, index=contingency.index, columns=contingency.columns).to_string()}
+
+Chi-Square Contributions:
+{contributions.to_string()}
+
+Decision:
+{"Reject" if p_value < 0.05 else "Fail to reject"} the null hypothesis at α = 0.05
+
+Note: The null hypothesis is that the variables are independent."""
+
+            self.sessionWindow.setText(report)
+
+            # Create visualization
+            plt.figure(figsize=(12, 5))
+            
+            # Observed frequencies plot
+            plt.subplot(1, 2, 1)
+            sns.heatmap(contingency, annot=True, fmt='d', cmap='YlOrRd')
+            plt.title('Observed Frequencies')
+            
+            # Expected frequencies plot
+            plt.subplot(1, 2, 2)
+            sns.heatmap(pd.DataFrame(expected, index=contingency.index, columns=contingency.columns),
+                       annot=True, fmt='.1f', cmap='YlOrRd')
+            plt.title('Expected Frequencies')
+            
+            plt.tight_layout()
+            plt.show()
+
+        except Exception as e:
+            QMessageBox.warning(self, "Error",
+                f"An error occurred during chi-square analysis:\n{str(e)}\n\n"
+                "Please check your data and try again.")
+
+    def chiSquareHomogeneity(self):
+        """Perform Chi-Square Test of Homogeneity"""
+        # Get category column
+        category_col = self.selectColumnDialog()
+        if not category_col:
+            return
+
+        # Get group column
+        group_col = self.selectColumnDialog()
+        if not group_col:
+            return
+
+        try:
+            # Create contingency table
+            contingency = pd.crosstab(self.data[group_col], self.data[category_col])
+            
+            # Perform chi-square test
+            chi2_stat, p_value, dof, expected = stats.chi2_contingency(contingency)
+            
+            # Calculate contributions to chi-square
+            contributions = (contingency - expected) ** 2 / expected
+
+            # Calculate proportions for each group
+            proportions = contingency.div(contingency.sum(axis=1), axis=0)
+
+            # Create report
+            report = f"""Chi-Square Test of Homogeneity Results
+
+Test Information:
+Groups: {group_col}
+Categories: {category_col}
+Number of groups: {contingency.shape[0]}
+Number of categories: {contingency.shape[1]}
+
+Test Statistics:
+Chi-square statistic: {chi2_stat:.4f}
+Degrees of freedom: {dof}
+p-value: {p_value:.4f}
+
+Contingency Table (Frequencies):
+{contingency.to_string()}
+
+Proportions within Groups:
+{proportions.to_string()}
+
+Expected Frequencies:
+{pd.DataFrame(expected, index=contingency.index, columns=contingency.columns).to_string()}
+
+Chi-Square Contributions:
+{contributions.to_string()}
+
+Decision:
+{"Reject" if p_value < 0.05 else "Fail to reject"} the null hypothesis at α = 0.05
+
+Note: The null hypothesis is that the proportions are the same across groups."""
+
+            self.sessionWindow.setText(report)
+
+            # Create visualizations
+            plt.figure(figsize=(15, 5))
+            
+            # Frequencies plot
+            plt.subplot(1, 3, 1)
+            sns.heatmap(contingency, annot=True, fmt='d', cmap='YlOrRd')
+            plt.title('Observed Frequencies')
+            
+            # Proportions plot
+            plt.subplot(1, 3, 2)
+            sns.heatmap(proportions, annot=True, fmt='.2f', cmap='YlOrRd')
+            plt.title('Proportions within Groups')
+            
+            # Expected frequencies plot
+            plt.subplot(1, 3, 3)
+            sns.heatmap(pd.DataFrame(expected, index=contingency.index, columns=contingency.columns),
+                       annot=True, fmt='.1f', cmap='YlOrRd')
+            plt.title('Expected Frequencies')
+            
+            plt.tight_layout()
+            plt.show()
+
+        except Exception as e:
+            QMessageBox.warning(self, "Error",
+                f"An error occurred during chi-square analysis:\n{str(e)}\n\n"
                 "Please check your data and try again.")
 
 if __name__ == '__main__':
