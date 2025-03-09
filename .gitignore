@@ -44,6 +44,22 @@ Cursor.AI/
 Software/
 backup_yml/
 Menu_截图/
+StandaloneMinitabLikeApp.exe 截图/
+build.bat
+check_mtbpy_COM.py
+chi_square_data.csv
+chi_square_test_data.csv
+control_chart_data.csv
+conversation_summary.md
+dataset/
+doe_test_cases.md
+goodness_of_fit_data.csv
+homogeneity_test_data.csv
+independence_test_data.csv
+kkk
+minitab_like_app.py
+minitab_like_app_v2.py
+minitab_like_app_v3.py
 
 # Python
 __pycache__/
