@@ -60,6 +60,19 @@ kkk
 minitab_like_app.py
 minitab_like_app_v2.py
 minitab_like_app_v3.py
+minitab_like_app_v4.py
+minitab_like_app_v5.py
+openCursor.bat
+sample_data.csv
+sample_data_v2.csv
+sample_data_v3.csv
+sample_test_csv/
+tatus
+test.csv
+test_guide.md
+work_version_backup/
+给安装Build相册方案/
+版本/
 
 # Python
 __pycache__/
