@@ -45,6 +45,7 @@ Software/
 backup_yml/
 Menu_截图/
 StandaloneMinitabLikeApp.exe 截图/
+给安装Build相册方案/
 build.bat
 check_mtbpy_COM.py
 chi_square_data.csv
@@ -71,7 +72,6 @@ tatus
 test.csv
 test_guide.md
 work_version_backup/
-给安装Build相册方案/
 版本/
 
 # Python
