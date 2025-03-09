@@ -98,13 +98,13 @@ class MinitabLikeApp(QMainWindow):
         super().__init__()
         self.setWindowTitle("Custom Minitab-Like Tool")
         self.resize(900, 600)
-        self.data = pd.DataFrame(columns=[f"C{i+1}" for i in range(10)])
+        self.data = pd.DataFrame()  # Initialize empty DataFrame
         self.initUI()
 
     def initUI(self):
-        self.table = QTableWidget(50, 10)
-        self.table.setHorizontalHeaderLabels(self.data.columns)
-
+        # Create table with no initial rows/columns
+        self.table = QTableWidget(0, 0)
+        
         self.sessionWindow = QTextEdit()
         self.sessionWindow.setReadOnly(True)
 
@@ -128,10 +128,18 @@ class MinitabLikeApp(QMainWindow):
         qualityMenu = QMenu("Quality", self)
         sixSigmaMenu = QMenu("Six Sigma", self)
 
-        # File Menu
-        fileMenu.addAction(self.makeAction("Open", self.openFile))
-        fileMenu.addAction(self.makeAction("Save", self.saveFile))
-        fileMenu.addAction(self.makeAction("Exit", self.close))
+        # File Menu with shortcuts
+        openAction = self.makeAction("Open", self.openFile)
+        openAction.setShortcut("Ctrl+O")
+        fileMenu.addAction(openAction)
+
+        saveAction = self.makeAction("Save", self.saveFile)
+        saveAction.setShortcut("Ctrl+S")
+        fileMenu.addAction(saveAction)
+
+        exitAction = self.makeAction("Exit", self.close)
+        exitAction.setShortcut("Alt+F4")
+        fileMenu.addAction(exitAction)
 
         # Stat Menu
         basicStatMenu = QMenu("Basic Statistics", self)
@@ -219,13 +227,37 @@ class MinitabLikeApp(QMainWindow):
         self.data = pd.DataFrame(data)
 
     def openFile(self):
-        filename, _ = QFileDialog.getOpenFileName(self, "Open File", "", "Excel Files (*.xlsx);;CSV Files (*.csv)")
-        if filename:
-            if filename.endswith('.csv'):
-                self.data = pd.read_csv(filename)
-            else:
-                self.data = pd.read_excel(filename)
-            self.updateTable()
+        try:
+            filename, _ = QFileDialog.getOpenFileName(self, "Open File", "", "CSV Files (*.csv);;Excel Files (*.xlsx)")
+            if filename:
+                try:
+                    if filename.endswith('.csv'):
+                        # First try to detect the encoding
+                        with open(filename, 'rb') as file:
+                            raw = file.read(4)
+                            if raw.startswith(b'\xff\xfe') or raw.startswith(b'\xfe\xff'):
+                                # UTF-16 detected
+                                data = pd.read_csv(filename, encoding='utf-16')
+                            else:
+                                # Regular UTF-8
+                                data = pd.read_csv(filename, encoding='utf-8')
+                        
+                        print("Data loaded successfully:")
+                        print(data.head())
+                        print("\nColumns:", data.columns.tolist())
+                        
+                        self.data = data
+                    else:
+                        self.data = pd.read_excel(filename)
+                    
+                    self.updateTable()
+                    
+                except Exception as e:
+                    QMessageBox.critical(self, "Error", 
+                        f"Failed to load file: {str(e)}\n\n"
+                        "Please ensure the file is a properly formatted CSV file with the correct headers.")
+        except Exception as e:
+            QMessageBox.critical(self, "Error", f"An error occurred while opening the file: {str(e)}")
 
     def saveFile(self):
         filename, _ = QFileDialog.getSaveFileName(self, "Save File", "", "CSV Files (*.csv);;Excel Files (*.xlsx)")
@@ -237,19 +269,81 @@ class MinitabLikeApp(QMainWindow):
                 self.data.to_excel(filename, index=False)
 
     def updateTable(self):
-        self.table.setRowCount(len(self.data))
-        self.table.setColumnCount(len(self.data.columns))
-        self.table.setHorizontalHeaderLabels(self.data.columns)
-        for row in range(len(self.data)):
-            for col in range(len(self.data.columns)):
-                value = self.data.iat[row, col]
-                if pd.notna(value):
-                    self.table.setItem(row, col, QTableWidgetItem(str(value)))
+        try:
+            if self.data.empty:
+                return
+                
+            # Clear existing contents
+            self.table.clear()
+            
+            # Set table dimensions
+            self.table.setRowCount(len(self.data))
+            self.table.setColumnCount(len(self.data.columns))
+            
+            # Set column headers
+            self.table.setHorizontalHeaderLabels(self.data.columns)
+            
+            # Populate table with data
+            for row in range(len(self.data)):
+                for col in range(len(self.data.columns)):
+                    value = self.data.iloc[row, col]
+                    if pd.notna(value):  # Check if value is not NaN
+                        item = QTableWidgetItem(str(value))
+                        self.table.setItem(row, col, item)
+            
+            # Adjust column widths
+            self.table.resizeColumnsToContents()
+            
+        except Exception as e:
+            QMessageBox.critical(self, "Error", f"Failed to update table: {str(e)}")
 
     def calculateDescriptiveStats(self):
+        """Calculate and display descriptive statistics with histogram"""
         self.loadDataFromTable()
-        stats_output = self.data.describe().to_string()
+        
+        # Get column selection from user
+        col = self.selectColumnDialog()
+        if not col:
+            return
+            
+        # Get numerical data
+        data = pd.to_numeric(self.data[col], errors='coerce').dropna()
+        
+        # Calculate statistics including median
+        stats_dict = {
+            'count': len(data),
+            'mean': np.mean(data),
+            'median': np.median(data),  # Added median calculation
+            'std': np.std(data, ddof=1),
+            'min': np.min(data),
+            '25%': np.percentile(data, 25),
+            '50%': np.percentile(data, 50),
+            '75%': np.percentile(data, 75),
+            'max': np.max(data)
+        }
+        
+        # Create formatted output
+        stats_output = "\n".join([f"{key:<10} {value:>10.6f}" for key, value in stats_dict.items()])
         self.sessionWindow.setText(f"Descriptive Statistics:\n\n{stats_output}")
+        
+        # Create histogram with normal curve
+        plt.figure(figsize=(10, 6))
+        
+        # Plot histogram
+        plt.hist(data, bins='auto', density=True, alpha=0.7, color='skyblue', label='Data')
+        
+        # Add normal curve
+        xmin, xmax = plt.xlim()
+        x = np.linspace(xmin, xmax, 100)
+        y = stats.norm.pdf(x, data.mean(), data.std())
+        plt.plot(x, y, 'r-', lw=2, label='Normal Distribution')
+        
+        plt.title(f'Histogram of {col} with Normal Curve')
+        plt.xlabel('Value')
+        plt.ylabel('Density')
+        plt.legend()
+        plt.grid(True, alpha=0.3)
+        plt.show()
 
     def calculateCorrelation(self):
         self.loadDataFromTable()
@@ -2312,12 +2406,26 @@ RPN > 100 indicates high priority items needing immediate attention.
         layout = QFormLayout()
 
         # Input fields
+        lsl_input = QLineEdit()
+        usl_input = QLineEdit()
+        mean_input = QLineEdit()
+        stddev_input = QLineEdit()
         units_input = QLineEdit()
-        defects_input = QLineEdit()
         opportunities_input = QLineEdit()
 
+        # Set default values from test guide
+        lsl_input.setText("10")
+        usl_input.setText("50")
+        mean_input.setText("30")
+        stddev_input.setText("5")
+        units_input.setText("100")
+        opportunities_input.setText("1")
+
+        layout.addRow("LSL:", lsl_input)
+        layout.addRow("USL:", usl_input)
+        layout.addRow("Mean:", mean_input)
+        layout.addRow("StdDev:", stddev_input)
         layout.addRow("Number of Units:", units_input)
-        layout.addRow("Total Defects:", defects_input)
         layout.addRow("Opportunities per Unit:", opportunities_input)
 
         # Results labels
@@ -2330,19 +2438,35 @@ RPN > 100 indicates high priority items needing immediate attention.
 
         def calculate_yield():
             try:
+                # Get input values
+                lsl = float(lsl_input.text())
+                usl = float(usl_input.text())
+                mean = float(mean_input.text())
+                stddev = float(stddev_input.text())
                 units = float(units_input.text())
-                defects = float(defects_input.text())
                 opportunities = float(opportunities_input.text())
 
-                # Calculate DPMO
-                dpmo = calculate_dpmo(defects, opportunities, units)
-                
-                # Calculate process yield
-                total_opportunities = units * opportunities
-                process_yield = ((total_opportunities - defects) / total_opportunities) * 100
+                # Calculate probability of defects using normal distribution
+                from scipy.stats import norm
+                prob_below_lsl = norm.cdf((lsl - mean) / stddev)
+                prob_above_usl = 1 - norm.cdf((usl - mean) / stddev)
+                total_defect_prob = prob_below_lsl + prob_above_usl
+
+                # Calculate total defects
+                total_defects = total_defect_prob * units
+
+                # Calculate yield metrics
+                process_yield = ((units - total_defects) / units) * 100
+                dpmo = (total_defects / (opportunities * units)) * 1000000
                 
                 # Calculate sigma level
-                sigma_level = dpmo_to_sigma(dpmo)
+                sigma_level = 0.8406 + np.sqrt(29.37 - 2.221 * np.log(dpmo)) if dpmo > 0 else float('inf')
+
+                # Calculate capability indices
+                cp = (usl - lsl) / (6 * stddev)  # Process capability
+                cpu = (usl - mean) / (3 * stddev)  # Upper capability index
+                cpl = (mean - lsl) / (3 * stddev)  # Lower capability index
+                cpk = min(cpu, cpl)  # Overall capability index
 
                 # Update labels
                 yield_label.setText(f"Process Yield: {process_yield:.2f}%")
@@ -2352,15 +2476,25 @@ RPN > 100 indicates high priority items needing immediate attention.
                 # Add results to session window
                 report = f"""Process Yield Analysis Results:
 ------------------------
+LSL: {lsl}
+USL: {usl}
+Mean: {mean}
+StdDev: {stddev}
 Number of Units: {units}
-Total Defects: {defects}
+Total Defects: {total_defects:.2f}
 Opportunities per Unit: {opportunities}
 ------------------------
 Process Yield: {process_yield:.2f}%
 DPMO: {dpmo:.2f}
 Sigma Level: {sigma_level:.2f}
+------------------------
+Capability Indices:
+Cp: {cp:.3f}
+Cpu: {cpu:.3f}
+Cpl: {cpl:.3f}
+Cpk: {cpk:.3f}
 """
-                self.sessionWindow.append(report)
+                self.sessionWindow.setText(report)
 
             except ValueError:
                 QMessageBox.warning(dialog, "Error", "Please enter valid numbers")
