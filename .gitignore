@@ -42,4 +42,52 @@ Thumbs.db
 *.spec
 Cursor.AI/
 Software/
-backup_yml/ 
+backup_yml/
+Menu_截图/
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+
+# Virtual Environment
+.env
+.venv
+env/
+venv/
+ENV/
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Project specific
+*.exe
+*.spec
+Cursor.AI/
+Software/
+backup_yml/
+Menu_截图/ 
