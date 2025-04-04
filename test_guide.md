@@ -1,4 +1,4 @@
-# Minitab-Like Application Test Guide
+ÿþ# Minitab-Like Application Test Guide
 
 ## Getting Started
 1. Run `dist/MinitabLikeApp.exe`
@@ -28,7 +28,7 @@ Data,Category,Value,Group
 ```
 - Go to: Stat > Basic Statistics > Descriptive Statistics
 - Load sample_data.csv
-- All columns (Data, Category, Value, Group) should appear in the grid window
+- All columns (Data, Category, Value, Groupshould appear in the grid window
 - Select 'Data' column for descriptive statistics
 - Expected Results:
   - Count = 10
@@ -186,7 +186,7 @@ Visualization Metrics:
 - DPI: 100
 
 Power Analysis:
-- Power (at Î± = 0.05) = 0.0880
+- Power (at Î± = 0.05= 0.0880
 - Required sample size for 0.80 power = 1625
 
 #### 2. Test of Independence
