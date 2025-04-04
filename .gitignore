@@ -20,6 +20,40 @@ wheels/
 .installed.cfg
 *.egg
 
+# Environments
+.env
+.venv
+env/
+venv/
+ENV/
+env.bak/
+venv.bak/
+
+# Project specific
+backups/
+temp/
+temp_py_backup/
+source_backups/
+key_files_backup/
+minitab_app.log
+*.log
+logs/
+crash_reports/
+*.bak
+*~
+*.swp
+*.swo
+.DS_Store
+coverage_original/
+cursor/
+.pytest_cache/
+.coverage
+
+# Editor 
+.vscode/
+.idea/
+*.sublime-workspace
+
 # Virtual Environment
 .env
 .venv
