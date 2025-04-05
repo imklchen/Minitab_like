@@ -1,0 +1,5 @@
+Process Step,Failure Mode,Effect,Severity,Occurrence,Detection
+Material Loading,Wrong Material,Product Defect,8,3,4
+Assembly,Missing Component,Function Failure,9,2,3
+Testing,Incorrect Settings,False Pass,7,4,5
+Packaging,Wrong Label,Customer Complaint,6,3,2

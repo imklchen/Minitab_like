@@ -1,0 +1,11 @@
+Process Step,Potential Failure Mode,Potential Effects,Severity (1-10),Potential Causes,Occurrence (1-10),Current Controls,Detection (1-10),RPN,Recommended Actions
+Material Loading,Wrong Material,Product Defect,8,Incorrect Material Selection,3,Visual Inspection,4,96,
+Assembly,Missing Component,Function Failure,9,Operator Error,2,Assembly Checklist,3,54,
+,,,,,,,,0,
+,,,,,,,,0,
+,,,,,,,,0,
+,,,,,,,,0,
+,,,,,,,,0,
+,,,,,,,,0,
+,,,,,,,,0,
+,,,,,,,,0,

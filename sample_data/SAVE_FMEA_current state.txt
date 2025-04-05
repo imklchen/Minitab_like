@@ -1,0 +1,30 @@
+FMEA Analysis Report
+
+Process/Product: Assembly Process
+Team/Responsible: Quality Team
+Date: 2025/3/19
+
+Summary of Failure Modes and Actions:
+
+Process Step: Material Loading
+Failure Mode: Wrong Material
+Potential Effects: Product Defect
+Severity: 8
+Potential Causes: Incorrect Material Selection
+Occurrence: 3
+Current Controls: Visual Inspection
+Detection: 4
+RPN: 96
+Recommended Actions: None
+--------------------------------------------------
+Process Step: Assembly
+Failure Mode: Missing Component
+Potential Effects: Function Failure
+Severity: 9
+Potential Causes: Operator Error
+Occurrence: 2
+Current Controls: Assembly Checklist
+Detection: 3
+RPN: 54
+Recommended Actions: None
+--------------------------------------------------

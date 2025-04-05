@@ -1,0 +1,10 @@
+Location,Defect_Type,Count
+Plant_A,Minor,125
+Plant_A,Major,45
+Plant_A,Critical,15
+Plant_B,Minor,142
+Plant_B,Major,38
+Plant_B,Critical,12
+Plant_C,Minor,138
+Plant_C,Major,41
+Plant_C,Critical,14

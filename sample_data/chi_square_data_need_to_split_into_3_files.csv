@@ -1,0 +1,35 @@
+# Goodness of Fit Test Data
+Category,Group,Count,Expected,Response
+A,Group1,30,25,Yes
+B,Group1,25,25,No
+C,Group1,20,25,Yes
+A,Group2,35,25,No
+B,Group2,30,25,Yes
+C,Group2,25,25,No
+A,Group3,28,25,Yes
+B,Group3,27,25,No
+C,Group3,22,25,Yes
+A,Group4,32,25,No
+B,Group4,29,25,Yes
+C,Group4,24,25,No
+A,Group5,31,25,Yes
+B,Group5,26,25,No
+C,Group5,23,25,Yes
+
+# Independence Test Data
+Gender,Product,Count
+Male,Product A,25
+Male,Product B,30
+Female,Product A,28
+Female,Product B,32
+Male,Product C,22
+Female,Product C,27
+
+# Homogeneity Test Data
+Treatment,Outcome,Count
+Control,Success,45
+Control,Failure,15
+Treatment A,Success,52
+Treatment A,Failure,8
+Treatment B,Success,48
+Treatment B,Failure,12 

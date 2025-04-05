@@ -1,0 +1,9 @@
+Temperature,Pressure,Time,Response
+Low,Low,Short,77.09
+Low,Low,Long,83.05
+Low,High,Short,82.73
+Low,High,Long,92.08
+High,Low,Short,84.35
+High,Low,Long,93.59
+High,High,Short,90.12
+High,High,Long,104.38
